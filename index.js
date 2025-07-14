@@ -29,7 +29,8 @@ await db.exec(`
 `);
 
 const app = express();
-const onlineUsers = new Set();
+const onlineUsers = new Map();
+const socketsToUsers = new Map();
 const server = createServer(app);
 const io = new Server(server, {
   connectionStateRecovery: {},
@@ -48,11 +49,14 @@ io.on("connection", async (socket) => {
   // Store username in socket data
   socket.data.username = username;
 
+  
+
   // Notify other users that someone joined
   socket.broadcast.emit("user joined", username);
 
-  onlineUsers.add(username);
-  io.emit("online users", Array.from(onlineUsers));
+  onlineUsers.set(username, socket.id);
+  socketsToUsers.set(socket.id, username);
+  io.emit("online users", Array.from(onlineUsers.keys()));
 
   socket.on("typing", () => {
     socket.broadcast.emit("typing", socket.data.username);
@@ -91,11 +95,22 @@ io.on("connection", async (socket) => {
     callback();
   });
 
+  socket.on("private message", ({ to, message }) => {
+    const targetSocketId = onlineUsers.get(to);
+    if (targetSocketId) {
+      io.to(targetSocketId).emit("private message", {
+        from: username,
+        message
+      });
+    }
+  });
+
   socket.on("disconnect", () => {
     // Notify other users that someone left
     socket.broadcast.emit("user left", username);
     onlineUsers.delete(username);
-    io.emit("online users", Array.from(onlineUsers));
+    socketsToUsers.delete(socket.id);
+    io.emit("online users", Array.from(onlineUsers.keys()));
   });
 
   if (!socket.recovered) {

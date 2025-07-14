@@ -32,6 +32,7 @@
     </form>
     <div id="typing-indicator" style="margin-left: 1rem; color: #888; font-style: italic;"></div>
     <div id="online-users" style="margin: 1rem; color: #333; font-weight: bold;"></div>
+    <div id="private-to" style="color: #2ecc40; font-weight: bold;"></div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -41,6 +42,7 @@
     let socket;
     let typing = false;
     let typingTimeout;
+    let privateRecipient = null;
 
     const usernameModal = document.getElementById("username-modal");
     const usernameInput = document.getElementById("username-input");
@@ -52,6 +54,7 @@
     const messages = document.getElementById("messages");
     const toggleButton = document.getElementById("toggle-btn");
     const typingIndicator = document.getElementById("typing-indicator");
+    const onlineUsersList = document.getElementById("online-users-list");
 
     input.addEventListener("input", () => {
       if (!typing && socket && socket.connected) {
@@ -116,12 +119,20 @@
     form.addEventListener("submit", (e) => {
       e.preventDefault();
       if (input.value && socket && socket.connected) {
-        // compute a unique offset
-        //console.log("Sending message:", input.value);
-        const clientOffset = `${socket.id}-${counter++}`;
-        socket.emit("chat message", input.value, clientOffset, () => {
-          // Optionally handle ack here
-        });
+        if (privateRecipient) {
+          socket.emit("private message", { to: privateRecipient, message: input.value });
+          // Optionally, show your own private message in the chat
+          const item = document.createElement("li");
+          item.innerHTML = `<span class="message-username">(to ${privateRecipient}):</span> ${input.value}`;
+          messages.appendChild(item);
+          window.scrollTo(0, document.body.scrollHeight);
+          privateRecipient = null;
+          document.getElementById("private-to").textContent = "";
+        } else {
+          // Normal public message
+          const clientOffset = `${socket.id}-${counter++}`;
+          socket.emit("chat message", input.value, clientOffset, () => { });
+        }
         input.value = "";
       }
     });
@@ -149,6 +160,7 @@
       socket.off("typing");
       socket.off("stop typing");
       socket.off("online users"); // Added this line
+      socket.off("private message"); // Added this line
 
       socket.on("chat message", (data) => {
         const item = document.createElement("li");
@@ -205,13 +217,32 @@
       const onlineUsersList = document.getElementById("online-users-list");
       socket.off("online users");
       socket.on("online users", (users) => {
+
         onlineUsersList.innerHTML = "";
         users.forEach((user) => {
           const li = document.createElement("li");
           li.className = "online-user";
           li.innerHTML = `<span class="online-dot"></span>${user}`;
+          li.style.cursor = "pointer";
+          li.onclick = () => {
+            if (user !== username) { // prevent sending to self
+              privateRecipient = user;
+              // Optionally, show in UI who you're messaging privately
+              document.getElementById("private-to").textContent = "Private to: " + user;
+            }
+          };
           onlineUsersList.appendChild(li);
         });
+
+
+      });
+
+      socket.on("private message", (data) => {
+        const item = document.createElement("li");
+        item.innerHTML = `<span class="message-username">(private from ${data.from}):</span> ${data.message}`;
+        item.style.background = "#e0ffe0";
+        messages.appendChild(item);
+        window.scrollTo(0, document.body.scrollHeight);
       });
     }
   </script>
