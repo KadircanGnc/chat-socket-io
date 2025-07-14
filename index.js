@@ -5,6 +5,12 @@ import { dirname, join } from "node:path";
 import { Server } from "socket.io";
 import sqlite3 from "sqlite3";
 import { open } from "sqlite";
+import fs from "fs";
+
+// Delete the database file if it exists
+if (fs.existsSync("chat.db")) {
+  fs.unlinkSync("chat.db");
+}
 
 // open the database file
 const db = await open({
@@ -42,6 +48,14 @@ io.on("connection", async (socket) => {
 
   // Notify other users that someone joined
   socket.broadcast.emit("user joined", username);
+
+  socket.on("typing", () => {
+    socket.broadcast.emit("typing", socket.data.username);
+  });
+  
+  socket.on("stop typing", () => {
+    socket.broadcast.emit("stop typing", socket.data.username);
+  });
 
   socket.on("chat message", async (msg, clientOffset, callback) => {
     //console.log("Received message:", msg, "from:", username); // Add this line
