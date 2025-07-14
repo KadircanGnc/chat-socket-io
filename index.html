@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Socket.IO chat</title>
+  <style>
+    body {
+      margin: 0;
+      padding-bottom: 3rem;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        Helvetica, Arial, sans-serif;
+    }
+
+    #form {
+      background: rgba(0, 0, 0, 0.15);
+      padding: 0.25rem;
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      height: 3rem;
+      box-sizing: border-box;
+      backdrop-filter: blur(10px);
+    }
+
+    #input {
+      border: none;
+      padding: 0 1rem;
+      flex-grow: 1;
+      border-radius: 2rem;
+      margin: 0.25rem;
+    }
+
+    #input:focus {
+      outline: none;
+    }
+
+    #form>button {
+      background: #333;
+      border: none;
+      padding: 0 1rem;
+      margin: 0.25rem;
+      border-radius: 3px;
+      outline: none;
+      color: #fff;
+    }
+
+    #messages {
+      list-style-type: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    #messages>li {
+      padding: 0.5rem 1rem;
+    }
+
+    #messages>li:nth-child(odd) {
+      background: #efefef;
+    }
+
+    /* Username modal styles */
+    #username-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    #username-form {
+      background: white;
+      padding: 2rem;
+      border-radius: 8px;
+      text-align: center;
+      min-width: 300px;
+    }
+
+    #username-input {
+      width: 100%;
+      padding: 0.5rem;
+      margin: 1rem 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+
+    #join-btn {
+      background: #333;
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .message-username {
+      font-weight: bold;
+      color: #666;
+      margin-right: 8px;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Username Modal -->
+  <div id="username-modal">
+    <div id="username-form">
+      <h2>Join Chat</h2>
+      <input id="username-input" type="text" placeholder="Enter your username" maxlength="20" required />
+      <br />
+      <button id="join-btn">Join Chat</button>
+    </div>
+  </div>
+
+  <!-- Chat Interface (initially hidden) -->
+  <div id="chat-container" class="hidden">
+    <ul id="messages"></ul>
+    <form id="form" action="">
+      <input id="input" autocomplete="off" /><button>Send</button>
+      <button id="toggle-btn">Disconnect</button>
+    </form>
+    <div id="typing-indicator" style="margin-left: 1rem; color: #888; font-style: italic;"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    let counter = 0;
+    let username = "";
+    let socket;
+    let typing = false;
+    let typingTimeout;
+
+    const usernameModal = document.getElementById("username-modal");
+    const usernameInput = document.getElementById("username-input");
+    const joinBtn = document.getElementById("join-btn");
+    const chatContainer = document.getElementById("chat-container");
+
+    const form = document.getElementById("form");
+    const input = document.getElementById("input");
+    const messages = document.getElementById("messages");
+    const toggleButton = document.getElementById("toggle-btn");
+    const typingIndicator = document.getElementById("typing-indicator");
+
+    input.addEventListener("input", () => {
+      if (!typing && socket && socket.connected) {
+        typing = true;
+        socket.emit("typing");
+      }
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => {
+        if (typing && socket && socket.connected) {
+          typing = false;
+          socket.emit("stop typing");
+        }
+      }, 1000); // 1 second after user stops typing
+    });
+
+    // Handle username submission
+    joinBtn.addEventListener("click", () => {
+      const enteredUsername = usernameInput.value.trim();
+      if (enteredUsername) {
+        username = enteredUsername;
+        connectToChat();
+      }
+    });
+
+    usernameInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        const enteredUsername = usernameInput.value.trim();
+        if (enteredUsername) {
+          username = enteredUsername;
+          connectToChat();
+        }
+      }
+    });
+
+    function connectToChat() {
+      // Hide username modal and show chat
+      usernameModal.classList.add("hidden");
+      chatContainer.classList.remove("hidden");
+
+      // Initialize socket connection with username
+      socket = io({
+        auth: {
+          serverOffset: 0,
+          username: username,
+        },
+        ackTimeout: 10000,
+        retries: 3,
+      });
+
+      // Wait for socket to connect before setting up events
+      socket.on('connect', () => {
+        console.log('Socket connected:', socket.id);
+        setupSocketEvents();
+      });
+
+      // Removed form and toggleButton event listeners from here
+      //setupSocketEvents();
+    }
+
+    // Move these event listeners outside connectToChat so they are only registered once
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (input.value && socket && socket.connected) {
+        // compute a unique offset
+        //console.log("Sending message:", input.value);
+        const clientOffset = `${socket.id}-${counter++}`;
+        socket.emit("chat message", input.value, clientOffset, () => {
+          // Optionally handle ack here
+        });
+        input.value = "";
+      }
+    });
+
+    toggleButton.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (!socket) return;
+      if (socket.connected) {
+        toggleButton.innerText = "Connect";
+        socket.disconnect();
+      } else {
+        toggleButton.innerText = "Disconnect";
+        socket.connect();
+      }
+    });
+
+    function setupSocketEvents() {
+
+      const typingIndicator = document.getElementById("typing-indicator");
+      let typingUsers = new Set();
+      // Remove previous listeners to avoid duplicates
+      socket.off("chat message");
+      socket.off("user joined");
+      socket.off("user left");
+      socket.off("typing");
+      socket.off("stop typing");
+
+      socket.on("chat message", (data) => {
+        const item = document.createElement("li");
+
+        if (data.username) {
+          const usernameSpan = document.createElement("span");
+          usernameSpan.className = "message-username";
+          usernameSpan.textContent = `${data.username}:`;
+          item.appendChild(usernameSpan);
+        }
+
+        const messageText = document.createTextNode(data.message);
+        item.appendChild(messageText);
+
+        messages.appendChild(item);
+        window.scrollTo(0, document.body.scrollHeight);
+
+        if (data.serverOffset) {
+          socket.auth.serverOffset = data.serverOffset;
+        }
+      });
+
+      socket.on("user joined", (username) => {
+        const item = document.createElement("li");
+        item.style.fontStyle = "italic";
+        item.style.color = "#666";
+        item.textContent = `${username} joined the chat`;
+        messages.appendChild(item);
+        window.scrollTo(0, document.body.scrollHeight);
+      });
+
+      socket.on("user left", (username) => {
+        const item = document.createElement("li");
+        item.style.fontStyle = "italic";
+        item.style.color = "#666";
+        item.textContent = `${username} left the chat`;
+        messages.appendChild(item);
+        window.scrollTo(0, document.body.scrollHeight);
+      });
+
+      socket.on("typing", (username) => {
+        typingUsers.add(username);
+        typingIndicator.textContent = `${Array.from(typingUsers).join(", ")} is typing...`;
+      });
+
+      socket.on("stop typing", (username) => {
+        typingUsers.delete(username);
+        typingIndicator.textContent = typingUsers.size
+          ? `${Array.from(typingUsers).join(", ")} is typing...`
+          : "";
+      });
+    }
+  </script>
+</body>
+
+</html>
