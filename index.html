@@ -4,114 +4,7 @@
 <head>
   <meta name="viewport" content="width=device-width,initial-scale=1.0" />
   <title>Socket.IO chat</title>
-  <style>
-    body {
-      margin: 0;
-      padding-bottom: 3rem;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-        Helvetica, Arial, sans-serif;
-    }
-
-    #form {
-      background: rgba(0, 0, 0, 0.15);
-      padding: 0.25rem;
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      display: flex;
-      height: 3rem;
-      box-sizing: border-box;
-      backdrop-filter: blur(10px);
-    }
-
-    #input {
-      border: none;
-      padding: 0 1rem;
-      flex-grow: 1;
-      border-radius: 2rem;
-      margin: 0.25rem;
-    }
-
-    #input:focus {
-      outline: none;
-    }
-
-    #form>button {
-      background: #333;
-      border: none;
-      padding: 0 1rem;
-      margin: 0.25rem;
-      border-radius: 3px;
-      outline: none;
-      color: #fff;
-    }
-
-    #messages {
-      list-style-type: none;
-      margin: 0;
-      padding: 0;
-    }
-
-    #messages>li {
-      padding: 0.5rem 1rem;
-    }
-
-    #messages>li:nth-child(odd) {
-      background: #efefef;
-    }
-
-    /* Username modal styles */
-    #username-modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background: rgba(0, 0, 0, 0.8);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      z-index: 1000;
-    }
-
-    #username-form {
-      background: white;
-      padding: 2rem;
-      border-radius: 8px;
-      text-align: center;
-      min-width: 300px;
-    }
-
-    #username-input {
-      width: 100%;
-      padding: 0.5rem;
-      margin: 1rem 0;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-      font-size: 16px;
-    }
-
-    #join-btn {
-      background: #333;
-      color: white;
-      border: none;
-      padding: 0.5rem 1rem;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 16px;
-    }
-
-    .hidden {
-      display: none !important;
-    }
-
-    .message-username {
-      font-weight: bold;
-      color: #666;
-      margin-right: 8px;
-    }
-  </style>
+  <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
@@ -125,6 +18,11 @@
     </div>
   </div>
 
+  <div id="online-users-container" class="hidden">
+    <h4>Online Users</h4>
+    <ul id="online-users-list"></ul>
+  </div>
+
   <!-- Chat Interface (initially hidden) -->
   <div id="chat-container" class="hidden">
     <ul id="messages"></ul>
@@ -133,6 +31,7 @@
       <button id="toggle-btn">Disconnect</button>
     </form>
     <div id="typing-indicator" style="margin-left: 1rem; color: #888; font-style: italic;"></div>
+    <div id="online-users" style="margin: 1rem; color: #333; font-weight: bold;"></div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -191,6 +90,7 @@
       // Hide username modal and show chat
       usernameModal.classList.add("hidden");
       chatContainer.classList.remove("hidden");
+      document.getElementById("online-users-container").classList.remove("hidden");
 
       // Initialize socket connection with username
       socket = io({
@@ -198,8 +98,8 @@
           serverOffset: 0,
           username: username,
         },
-        ackTimeout: 2000, // instead of 10000
-        retries: 3,
+        //ackTimeout: 2000, // instead of 10000
+        //retries: 3,
       });
 
       // Wait for socket to connect before setting up events
@@ -248,6 +148,7 @@
       socket.off("user left");
       socket.off("typing");
       socket.off("stop typing");
+      socket.off("online users"); // Added this line
 
       socket.on("chat message", (data) => {
         const item = document.createElement("li");
@@ -268,7 +169,7 @@
         if (data.serverOffset) {
           socket.auth.serverOffset = data.serverOffset;
         }
-        
+
       });
 
       socket.on("user joined", (username) => {
@@ -299,6 +200,18 @@
         typingIndicator.textContent = typingUsers.size
           ? `${Array.from(typingUsers).join(", ")} is typing...`
           : "";
+      });
+
+      const onlineUsersList = document.getElementById("online-users-list");
+      socket.off("online users");
+      socket.on("online users", (users) => {
+        onlineUsersList.innerHTML = "";
+        users.forEach((user) => {
+          const li = document.createElement("li");
+          li.className = "online-user";
+          li.innerHTML = `<span class="online-dot"></span>${user}`;
+          onlineUsersList.appendChild(li);
+        });
       });
     }
   </script>

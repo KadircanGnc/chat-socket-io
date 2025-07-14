@@ -29,6 +29,7 @@ await db.exec(`
 `);
 
 const app = express();
+const onlineUsers = new Set();
 const server = createServer(app);
 const io = new Server(server, {
   connectionStateRecovery: {},
@@ -36,6 +37,7 @@ const io = new Server(server, {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+app.use(express.static(__dirname));
 app.get("/", (req, res) => {
   res.sendFile(join(__dirname, "index.html"));
 });
@@ -48,6 +50,9 @@ io.on("connection", async (socket) => {
 
   // Notify other users that someone joined
   socket.broadcast.emit("user joined", username);
+
+  onlineUsers.add(username);
+  io.emit("online users", Array.from(onlineUsers));
 
   socket.on("typing", () => {
     socket.broadcast.emit("typing", socket.data.username);
@@ -89,6 +94,8 @@ io.on("connection", async (socket) => {
   socket.on("disconnect", () => {
     // Notify other users that someone left
     socket.broadcast.emit("user left", username);
+    onlineUsers.delete(username);
+    io.emit("online users", Array.from(onlineUsers));
   });
 
   if (!socket.recovered) {
@@ -110,8 +117,6 @@ io.on("connection", async (socket) => {
     }
   }
 });
-
-
 
 server.listen(3000, () => {
   console.log("server running at http://localhost:3000");
