@@ -82,7 +82,6 @@ socket-io-example/
 - `chat message` - Send a chat message
 - `private message` - Send a private message to specific user
 - `typing` - Notify others that user is typing
-- `stop typing` - Stop typing notification
 
 ### Server to Client Events
 
@@ -92,7 +91,6 @@ socket-io-example/
 - `user left` - User left notification
 - `online users` - List of currently online users
 - `typing` - Someone is typing notification
-- `stop typing` - Someone stopped typing
 
 ## Features in Detail
 
@@ -147,25 +145,6 @@ npm install -g nodemon
 nodemon index.js
 ```
 
-## Screenshots
-
-### Username Entry
-![Username Modal](screenshots/username-modal.png)
-
-### Chat Interface
-![Chat Interface](screenshots/chat-interface.png)
-
-### Private Messaging
-![Private Messages](screenshots/private-messages.png)
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
 ## Known Issues
 
 - Database file is recreated on each server restart (for development)
@@ -184,13 +163,7 @@ nodemon index.js
 - [ ] Message reactions
 - [ ] Dark/light theme toggle
 
-## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Author
-
-Your Name - [@yourusername](https://github.com/yourusername)
 
 ## Acknowledgments
 
