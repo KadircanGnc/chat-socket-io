@@ -47,9 +47,7 @@ io.on("connection", async (socket) => {
   const username = socket.handshake.auth.username || "Anonymous";
 
   // Store username in socket data
-  socket.data.username = username;
-
-  
+  socket.data.username = username;  
 
   // Notify other users that someone joined
   socket.broadcast.emit("user joined", username);
